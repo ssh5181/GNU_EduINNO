@@ -185,7 +185,13 @@
                     edgeSet.add(edge2Id);
                 }
             });
-
+                        // 💡 새롭게 추가된 부분: 프로그램 노드에 건수와 총 인원 표시
+            nodeMap.forEach(node => {
+                if (node.group === 'Program') {
+                    node.label = `${node.label}\n(${node.details.length}건 / ${node.value}명)`;
+                }
+            });
+            
             nodesData = Array.from(nodeMap.values());
             
             populateFilters('semesterFilter', semesters);
