@@ -103,15 +103,12 @@
         window.onload = function() {
             fetch('data.csv')
                 .then(response => {
-                    if (!response.ok) {
-                        throw new Error("CSV 파일을 찾을 수 없습니다. 파일명이 'data.csv'인지 확인하세요.");
-                    }
+                    if (!response.ok) throw new Error("CSV 파일을 찾을 수 없습니다.");
                     return response.text();
                 })
                 .then(csvText => {
                     Papa.parse(csvText, {
-                        header: true,
-                        skipEmptyLines: true,
+                        header: true, skipEmptyLines: true,
                         complete: function(results) {
                             document.getElementById('loading-overlay').style.display = 'none';
                             processData(results.data);
@@ -124,7 +121,6 @@
                 })
                 .catch(error => {
                     document.getElementById('loading-overlay').innerHTML = `<span style="color:red;">오류: ${error.message}</span>`;
-                    console.error(error);
                 });
         };
 
@@ -159,24 +155,23 @@
                     nodeMap.set(deptId, { id: deptId, label: dept, group: 'Department', shape: 'box', color: '#69db7c', font: { color: 'white' }, hidden: false });
                 }
 
+                // 💡 다시 'dot' 모양으로 되돌려 value(참여자 총합 등)에 의해 크기가 비례하여 커지도록 설정
                 if (!nodeMap.has(progId)) {
-                    // 💡 핵심 변경사항: shape를 'dot'에서 'circle'로 변경하여 글씨가 원 안에 들어가게 함
                     nodeMap.set(progId, { 
                         id: progId, 
-                        label: prog, 
+                        label: prog, // 프로그램명만 라벨로 사용 (기본적으로 점 아래에 표시됨)
                         group: 'Program', 
-                        shape: 'circle', 
+                        shape: 'dot', 
                         color: '#ffa94d', 
                         value: 0, 
                         details: [], 
-                        hidden: false,
-                        // 💡 추가 설정: 글자색을 진하게 하여 주황색 배경에서 잘 보이도록 처리
-                        font: { color: '#212529', face: 'Pretendard, "Malgun Gothic", sans-serif' }
+                        hidden: false 
                     });
                 }
 
                 const progNode = nodeMap.get(progId);
                 progNode.details.push(row);
+                // 참여자 수와 건수를 반영하여 원의 기준 크기(value) 설정
                 progNode.value += (parseInt(row['수료자'], 10) || 0);
 
                 const edge1Id = targetId + '_' + progId;
@@ -189,14 +184,6 @@
                 if (!edgeSet.has(edge2Id)) {
                     edgesData.push({ from: deptId, to: progId, color: { color: '#ced4da' } });
                     edgeSet.add(edge2Id);
-                }
-            });
-
-            // 💡 프로그램 노드의 라벨 텍스트 업데이트 로직
-            nodeMap.forEach(node => {
-                if (node.group === 'Program') {
-                    // 프로그램명, 건수, 인원을 원 안에 함께 표시
-                    node.label = `${node.label}\n(${node.details.length}건 / ${node.value}명)`;
                 }
             });
 
@@ -258,9 +245,9 @@
             const options = {
                 nodes: {
                     borderWidth: 2, borderWidthSelected: 4,
-                    // 💡 font size 설정을 통해 원 안의 글자 크기 조정
-                    font: { size: 14, align: 'center' },
-                    scaling: { min: 20, max: 60, label: { enabled: true, min: 14, max: 18 } },
+                    font: { size: 14, face: 'Pretendard, "Malgun Gothic", sans-serif', color: '#343a40' },
+                    // 원의 크기가 데이터(value)에 비례하도록 범위 설정
+                    scaling: { min: 25, max: 70, label: { enabled: true, min: 14, max: 20 } },
                     shadow: true
                 },
                 edges: { width: 1.5, smooth: { type: 'continuous' }, hoverWidth: 2, selectionWidth: 3 },
@@ -275,6 +262,31 @@
             if (network !== null) { network.destroy(); network = null; }
 
             network = new vis.Network(container, data, options);
+
+            // 💡 캔버스에 점(dot)들이 그려진 직후, 원 안쪽 중앙에 건수/인원 텍스트를 수동으로 입히는 로직
+            network.on("afterDrawing", function (ctx) {
+                const positions = network.getPositions();
+                
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = 'bold 12px Pretendard, "Malgun Gothic", sans-serif';
+
+                nodesData.forEach(node => {
+                    // 숨겨지지 않은 프로그램 노드에만 그리기
+                    if (node.group === 'Program' && !node.hidden) {
+                        const pos = positions[node.id];
+                        if (pos) {
+                            // 텍스트 색상을 하얀색으로 하여 주황색 원 안에서 눈에 띄게 함
+                            ctx.fillStyle = '#ffffff'; 
+                            
+                            // 원 중앙을 기준으로 위아래 두 줄로 나누어 글자 배치
+                            ctx.fillText(`${node.details.length}건`, pos.x, pos.y - 7);
+                            ctx.fillText(`${node.value}명`, pos.x, pos.y + 7);
+                        }
+                    }
+                });
+            });
+
             bindNetworkEvents(); 
         }
 
@@ -293,8 +305,7 @@
                 const clickedNode = nodesData.find(n => n.id === nodeId);
                 if (!clickedNode) return;
 
-                // 클릭했을 때 우측 제목에는 프로그램명만 보이도록 처리 (건수/명 제외)
-                detailTitle.innerText = clickedNode.label.split('\n')[0];
+                detailTitle.innerText = clickedNode.label;
                 let html = '';
 
                 if (clickedNode.group === 'Program') {
@@ -336,8 +347,7 @@
                     html += `<p style="font-size: 1rem; color: #495057; margin-bottom: 15px;">이 ${groupName}와(과) 연관된 프로그램은 <strong>총 ${connectedPrograms.length}개</strong>입니다.</p><ul>`;
                     
                     connectedPrograms.forEach(prog => {
-                        let progName = prog.label.split('\n')[0];
-                        html += `<li><strong>${progName}</strong></li>`;
+                        html += `<li><strong>${prog.label}</strong></li>`;
                     });
                     html += `</ul>`;
                 }
