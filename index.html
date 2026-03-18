@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>교육혁신처 프로그램 네트워크 시각화</title>
     
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
@@ -13,11 +13,14 @@
             margin: 0; padding: 0; width: 100%; height: 100%;
             font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
             background-color: #f8f9fa;
+            /* 모바일에서 당겨서 새로고침 방지 등 부드러운 스크롤을 위한 설정 */
+            overscroll-behavior-y: none;
         }
 
         #control-bar {
             padding: 10px 20px; background-color: #343a40; color: white;
             display: flex; align-items: center; gap: 15px; flex-wrap: wrap;
+            box-sizing: border-box;
         }
 
         #control-bar select {
@@ -54,10 +57,51 @@
             color: #868e96; text-align: center; margin-top: 50px;
         }
 
+        /* 📱 모바일 반응형(Responsive) 스타일 추가 및 개선 */
         @media (max-width: 768px) {
-            #app-container { flex-direction: column; }
-            #network-container { flex: 6; }
-            #detail-panel { flex: 4; border-left: none; border-top: 2px solid #dee2e6; }
+            #control-bar {
+                flex-direction: column; /* 세로 정렬 */
+                align-items: flex-start; /* 왼쪽 정렬 */
+                gap: 10px;
+                padding: 12px 15px;
+            }
+
+            .filter-container {
+                width: 100%;
+                display: flex;
+                justify-content: space-between; /* 레이블과 셀렉트박스를 양끝으로 */
+                align-items: center;
+                border-left: none !important; /* 모바일에서는 구분선 제거 */
+                padding-left: 0 !important;
+                margin-left: 0 !important;
+            }
+
+            .filter-container select {
+                width: 60%; /* 모바일에서 셀렉트박스 터치 영역 확보 */
+            }
+
+            #app-container {
+                flex-direction: column; /* 위아래로 분할 */
+                /* 컨트롤 바 높이 변화를 감안하여 전체 높이 재계산 */
+                height: calc(100vh - 110px); 
+            }
+
+            #network-container {
+                flex: none;
+                height: 55%; /* 모바일 화면의 상단 55%를 네트워크 맵으로 사용 */
+            }
+
+            #detail-panel {
+                flex: none;
+                height: 45%; /* 하단 45%를 상세 정보 창으로 사용 */
+                border-left: none;
+                border-top: 2px solid #dee2e6; /* 위쪽 테두리로 구분선 변경 */
+                padding: 15px;
+            }
+
+            #detail-panel h2 {
+                font-size: 1.2rem; /* 모바일 폰트 크기 최적화 */
+            }
         }
     </style>
 </head>
@@ -67,14 +111,14 @@
             📌 교육혁신처 프로그램 운영 현황
         </div>
         
-        <div style="border-left: 1px solid #6c757d; padding-left: 15px; margin-left: auto;">
+        <div class="filter-container" style="border-left: 1px solid #6c757d; padding-left: 15px; margin-left: auto;">
             <label for="semesterFilter">운영학기:</label>
             <select id="semesterFilter">
                 <option value="all">전체</option>
             </select>
         </div>
 
-        <div>
+        <div class="filter-container">
             <label for="fundingFilter">재원:</label>
             <select id="fundingFilter">
                 <option value="all">전체</option>
@@ -89,7 +133,7 @@
         <div id="detail-panel">
             <h2>상세 정보</h2>
             <div id="detail-content">
-                <p class="placeholder-text">왼쪽 캔버스에서 노드(점)를 클릭하면<br>상세 내역이 이곳에 표시됩니다.</p>
+                <p class="placeholder-text">캔버스에서 노드(점)를 터치하면<br>상세 내역이 이곳에 표시됩니다.</p>
             </div>
         </div>
     </div>
@@ -155,11 +199,10 @@
                     nodeMap.set(deptId, { id: deptId, label: dept, group: 'Department', shape: 'box', color: '#69db7c', font: { color: 'white' }, hidden: false });
                 }
 
-                // 💡 다시 'dot' 모양으로 되돌려 value(참여자 총합 등)에 의해 크기가 비례하여 커지도록 설정
                 if (!nodeMap.has(progId)) {
                     nodeMap.set(progId, { 
                         id: progId, 
-                        label: prog, // 프로그램명만 라벨로 사용 (기본적으로 점 아래에 표시됨)
+                        label: prog,
                         group: 'Program', 
                         shape: 'dot', 
                         color: '#ffa94d', 
@@ -171,7 +214,6 @@
 
                 const progNode = nodeMap.get(progId);
                 progNode.details.push(row);
-                // 참여자 수와 건수를 반영하여 원의 기준 크기(value) 설정
                 progNode.value += (parseInt(row['수료자'], 10) || 0);
 
                 const edge1Id = targetId + '_' + progId;
@@ -246,7 +288,6 @@
                 nodes: {
                     borderWidth: 2, borderWidthSelected: 4,
                     font: { size: 14, face: 'Pretendard, "Malgun Gothic", sans-serif', color: '#343a40' },
-                    // 원의 크기가 데이터(value)에 비례하도록 범위 설정
                     scaling: { min: 25, max: 70, label: { enabled: true, min: 14, max: 20 } },
                     shadow: true
                 },
@@ -263,7 +304,7 @@
 
             network = new vis.Network(container, data, options);
 
-            // 💡 캔버스에 점(dot)들이 그려진 직후, 원 안쪽 중앙에 건수/인원 텍스트를 수동으로 입히는 로직
+            // 원 중앙에 건수/인원 텍스트 그리기 로직 유지
             network.on("afterDrawing", function (ctx) {
                 const positions = network.getPositions();
                 
@@ -272,14 +313,10 @@
                 ctx.font = 'bold 12px Pretendard, "Malgun Gothic", sans-serif';
 
                 nodesData.forEach(node => {
-                    // 숨겨지지 않은 프로그램 노드에만 그리기
                     if (node.group === 'Program' && !node.hidden) {
                         const pos = positions[node.id];
                         if (pos) {
-                            // 텍스트 색상을 하얀색으로 하여 주황색 원 안에서 눈에 띄게 함
                             ctx.fillStyle = '#ffffff'; 
-                            
-                            // 원 중앙을 기준으로 위아래 두 줄로 나누어 글자 배치
                             ctx.fillText(`${node.details.length}건`, pos.x, pos.y - 7);
                             ctx.fillText(`${node.value}명`, pos.x, pos.y + 7);
                         }
@@ -297,7 +334,7 @@
                 
                 if (params.nodes.length === 0) {
                     detailTitle.innerText = "상세 정보";
-                    detailContent.innerHTML = '<p class="placeholder-text">왼쪽 캔버스에서 노드(점)를 클릭하면<br>상세 내역이 이곳에 표시됩니다.</p>';
+                    detailContent.innerHTML = '<p class="placeholder-text">캔버스에서 노드(점)를 터치하면<br>상세 내역이 이곳에 표시됩니다.</p>';
                     return;
                 }
 
