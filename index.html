@@ -32,7 +32,6 @@
             flex: 7; height: 100%; background-color: #ffffff; position: relative;
         }
 
-        /* 로딩 화면 스타일 */
         #loading-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(255,255,255,0.8); z-index: 1000;
@@ -101,23 +100,19 @@
         let network = null;
         let nodesDataSet = null;
 
-        // 웹 페이지가 로드되자마자 실행되는 함수 (자동 로딩 핵심 로직)
         window.onload = function() {
-            // 서버에 있는 data.csv 파일을 자동으로 요청하여 가져옴
             fetch('data.csv')
                 .then(response => {
                     if (!response.ok) {
                         throw new Error("CSV 파일을 찾을 수 없습니다. 파일명이 'data.csv'인지 확인하세요.");
                     }
-                    return response.text(); // 텍스트 데이터로 변환
+                    return response.text();
                 })
                 .then(csvText => {
-                    // 가져온 텍스트 데이터를 PapaParse로 분석
                     Papa.parse(csvText, {
                         header: true,
                         skipEmptyLines: true,
                         complete: function(results) {
-                            // 로딩 오버레이 숨기기
                             document.getElementById('loading-overlay').style.display = 'none';
                             processData(results.data);
                         },
@@ -133,7 +128,6 @@
                 });
         };
 
-        // 2. 데이터 변환 및 필터 메뉴 세팅
         function processData(data) {
             const nodeMap = new Map();
             const edgeSet = new Set();
@@ -166,7 +160,19 @@
                 }
 
                 if (!nodeMap.has(progId)) {
-                    nodeMap.set(progId, { id: progId, label: prog, group: 'Program', shape: 'dot', color: '#ffa94d', value: 0, details: [], hidden: false });
+                    // 💡 핵심 변경사항: shape를 'dot'에서 'circle'로 변경하여 글씨가 원 안에 들어가게 함
+                    nodeMap.set(progId, { 
+                        id: progId, 
+                        label: prog, 
+                        group: 'Program', 
+                        shape: 'circle', 
+                        color: '#ffa94d', 
+                        value: 0, 
+                        details: [], 
+                        hidden: false,
+                        // 💡 추가 설정: 글자색을 진하게 하여 주황색 배경에서 잘 보이도록 처리
+                        font: { color: '#212529', face: 'Pretendard, "Malgun Gothic", sans-serif' }
+                    });
                 }
 
                 const progNode = nodeMap.get(progId);
@@ -185,13 +191,15 @@
                     edgeSet.add(edge2Id);
                 }
             });
-                        // 💡 새롭게 추가된 부분: 프로그램 노드에 건수와 총 인원 표시
+
+            // 💡 프로그램 노드의 라벨 텍스트 업데이트 로직
             nodeMap.forEach(node => {
                 if (node.group === 'Program') {
+                    // 프로그램명, 건수, 인원을 원 안에 함께 표시
                     node.label = `${node.label}\n(${node.details.length}건 / ${node.value}명)`;
                 }
             });
-            
+
             nodesData = Array.from(nodeMap.values());
             
             populateFilters('semesterFilter', semesters);
@@ -200,7 +208,6 @@
             drawNetwork();
         }
 
-        // 필터 옵션 생성 함수
         function populateFilters(selectId, setValues) {
             const select = document.getElementById(selectId);
             select.innerHTML = '<option value="all">전체</option>'; 
@@ -212,7 +219,6 @@
             });
         }
 
-        // 3. 필터링 로직
         function applyFilters() {
             const sem = document.getElementById('semesterFilter').value;
             const fund = document.getElementById('fundingFilter').value;
@@ -243,7 +249,6 @@
         document.getElementById('semesterFilter').addEventListener('change', applyFilters);
         document.getElementById('fundingFilter').addEventListener('change', applyFilters);
 
-        // 4. 네트워크 렌더링
         function drawNetwork() {
             const container = document.getElementById('network-container');
             
@@ -253,8 +258,9 @@
             const options = {
                 nodes: {
                     borderWidth: 2, borderWidthSelected: 4,
-                    font: { size: 14, face: 'Pretendard, "Malgun Gothic", sans-serif', color: '#343a40' },
-                    scaling: { min: 15, max: 50, label: { enabled: true, min: 14, max: 20 } },
+                    // 💡 font size 설정을 통해 원 안의 글자 크기 조정
+                    font: { size: 14, align: 'center' },
+                    scaling: { min: 20, max: 60, label: { enabled: true, min: 14, max: 18 } },
                     shadow: true
                 },
                 edges: { width: 1.5, smooth: { type: 'continuous' }, hoverWidth: 2, selectionWidth: 3 },
@@ -272,7 +278,6 @@
             bindNetworkEvents(); 
         }
 
-        // 5. 클릭 이벤트
         function bindNetworkEvents() {
             network.on("click", function (params) {
                 const detailContent = document.getElementById('detail-content');
@@ -288,7 +293,8 @@
                 const clickedNode = nodesData.find(n => n.id === nodeId);
                 if (!clickedNode) return;
 
-                detailTitle.innerText = clickedNode.label;
+                // 클릭했을 때 우측 제목에는 프로그램명만 보이도록 처리 (건수/명 제외)
+                detailTitle.innerText = clickedNode.label.split('\n')[0];
                 let html = '';
 
                 if (clickedNode.group === 'Program') {
@@ -330,7 +336,8 @@
                     html += `<p style="font-size: 1rem; color: #495057; margin-bottom: 15px;">이 ${groupName}와(과) 연관된 프로그램은 <strong>총 ${connectedPrograms.length}개</strong>입니다.</p><ul>`;
                     
                     connectedPrograms.forEach(prog => {
-                        html += `<li><strong>${prog.label}</strong></li>`;
+                        let progName = prog.label.split('\n')[0];
+                        html += `<li><strong>${progName}</strong></li>`;
                     });
                     html += `</ul>`;
                 }
