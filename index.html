@@ -13,7 +13,6 @@
             margin: 0; padding: 0; width: 100%; height: 100%;
             font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
             background-color: #f8f9fa;
-            /* 모바일에서 당겨서 새로고침 방지 등 부드러운 스크롤을 위한 설정 */
             overscroll-behavior-y: none;
         }
 
@@ -57,11 +56,10 @@
             color: #868e96; text-align: center; margin-top: 50px;
         }
 
-        /* 📱 모바일 반응형(Responsive) 스타일 추가 및 개선 */
         @media (max-width: 768px) {
             #control-bar {
-                flex-direction: column; /* 세로 정렬 */
-                align-items: flex-start; /* 왼쪽 정렬 */
+                flex-direction: column; 
+                align-items: flex-start; 
                 gap: 10px;
                 padding: 12px 15px;
             }
@@ -69,38 +67,37 @@
             .filter-container {
                 width: 100%;
                 display: flex;
-                justify-content: space-between; /* 레이블과 셀렉트박스를 양끝으로 */
+                justify-content: space-between; 
                 align-items: center;
-                border-left: none !important; /* 모바일에서는 구분선 제거 */
+                border-left: none !important; 
                 padding-left: 0 !important;
                 margin-left: 0 !important;
             }
 
             .filter-container select {
-                width: 60%; /* 모바일에서 셀렉트박스 터치 영역 확보 */
+                width: 60%; 
             }
 
             #app-container {
-                flex-direction: column; /* 위아래로 분할 */
-                /* 컨트롤 바 높이 변화를 감안하여 전체 높이 재계산 */
+                flex-direction: column; 
                 height: calc(100vh - 110px); 
             }
 
             #network-container {
                 flex: none;
-                height: 55%; /* 모바일 화면의 상단 55%를 네트워크 맵으로 사용 */
+                height: 55%; 
             }
 
             #detail-panel {
                 flex: none;
-                height: 45%; /* 하단 45%를 상세 정보 창으로 사용 */
+                height: 45%; 
                 border-left: none;
-                border-top: 2px solid #dee2e6; /* 위쪽 테두리로 구분선 변경 */
+                border-top: 2px solid #dee2e6; 
                 padding: 15px;
             }
 
             #detail-panel h2 {
-                font-size: 1.2rem; /* 모바일 폰트 크기 최적화 */
+                font-size: 1.2rem; 
             }
         }
     </style>
@@ -216,15 +213,16 @@
                 progNode.details.push(row);
                 progNode.value += (parseInt(row['수료자'], 10) || 0);
 
+                // 💡 개별 에지에 지정하던 색상(color) 옵션 제거하여 글로벌 옵션을 따르도록 수정
                 const edge1Id = targetId + '_' + progId;
                 if (!edgeSet.has(edge1Id)) {
-                    edgesData.push({ from: targetId, to: progId, color: { color: '#ced4da' } });
+                    edgesData.push({ from: targetId, to: progId });
                     edgeSet.add(edge1Id);
                 }
 
                 const edge2Id = deptId + '_' + progId;
                 if (!edgeSet.has(edge2Id)) {
-                    edgesData.push({ from: deptId, to: progId, color: { color: '#ced4da' } });
+                    edgesData.push({ from: deptId, to: progId });
                     edgeSet.add(edge2Id);
                 }
             });
@@ -289,9 +287,33 @@
                     borderWidth: 2, borderWidthSelected: 4,
                     font: { size: 14, face: 'Pretendard, "Malgun Gothic", sans-serif', color: '#343a40' },
                     scaling: { min: 25, max: 70, label: { enabled: true, min: 14, max: 20 } },
-                    shadow: true
+                    shadow: true,
+                    // 💡 새롭게 추가된 부분: 클릭(선택) 시의 글자와 테두리 스타일 제어
+                    chosen: {
+                        label: function(values, id, selected, hovering) {
+                            if (selected) {
+                                values.color = '#e03131'; // 진한 빨간색
+                                values.strokeWidth = 2;   // 글씨에 흰색 외곽선을 줘서 더 잘보이게
+                                values.strokeColor = '#ffffff';
+                            }
+                        },
+                        node: function(values, id, selected, hovering) {
+                            if (selected) {
+                                values.borderColor = '#e03131'; // 클릭 시 원 테두리도 빨간색으로
+                            }
+                        }
+                    }
                 },
-                edges: { width: 1.5, smooth: { type: 'continuous' }, hoverWidth: 2, selectionWidth: 3 },
+                edges: { 
+                    width: 1.5, 
+                    smooth: { type: 'continuous' }, 
+                    hoverWidth: 2, 
+                    selectionWidth: 4, // 💡 기존 3에서 4로 두께 증가 (선택 시 더 두껍게)
+                    color: {
+                        color: '#ced4da', // 평상시 연한 회색 선
+                        highlight: '#e03131' // 💡 클릭 시 빨간색 굵은 선으로 변경!
+                    }
+                },
                 physics: {
                     enabled: true, solver: 'forceAtlas2Based',
                     forceAtlas2Based: { gravitationalConstant: -80, centralGravity: 0.01, springLength: 150, springConstant: 0.08 },
@@ -304,7 +326,6 @@
 
             network = new vis.Network(container, data, options);
 
-            // 원 중앙에 건수/인원 텍스트 그리기 로직 유지
             network.on("afterDrawing", function (ctx) {
                 const positions = network.getPositions();
                 
