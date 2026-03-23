@@ -193,7 +193,17 @@
                 }
 
                 if (!nodeMap.has(deptId)) {
-                    nodeMap.set(deptId, { id: deptId, label: dept, group: 'Department', shape: 'box', color: '#69db7c', font: { color: 'white' }, hidden: false });
+                    // 💡 운영부서 노드 스타일 변경: 진한 회색 바탕, 노란색 글씨, 크기 및 여백 확대
+                    nodeMap.set(deptId, { 
+                        id: deptId, 
+                        label: dept, 
+                        group: 'Department', 
+                        shape: 'box', 
+                        color: { background: '#495057', border: '#343a40' }, // 바탕색과 테두리
+                        font: { color: '#ffd43b', size: 18, face: 'Pretendard, "Malgun Gothic", sans-serif' }, // 노란색 글씨, 크기 확대(기존 14->18)
+                        margin: { top: 12, right: 18, bottom: 12, left: 18 }, // 글상자 여백 확대
+                        hidden: false 
+                    });
                 }
 
                 if (!nodeMap.has(progId)) {
@@ -213,7 +223,6 @@
                 progNode.details.push(row);
                 progNode.value += (parseInt(row['수료자'], 10) || 0);
 
-                // 💡 개별 에지에 지정하던 색상(color) 옵션 제거하여 글로벌 옵션을 따르도록 수정
                 const edge1Id = targetId + '_' + progId;
                 if (!edgeSet.has(edge1Id)) {
                     edgesData.push({ from: targetId, to: progId });
@@ -288,18 +297,17 @@
                     font: { size: 14, face: 'Pretendard, "Malgun Gothic", sans-serif', color: '#343a40' },
                     scaling: { min: 25, max: 70, label: { enabled: true, min: 14, max: 20 } },
                     shadow: true,
-                    // 💡 새롭게 추가된 부분: 클릭(선택) 시의 글자와 테두리 스타일 제어
                     chosen: {
                         label: function(values, id, selected, hovering) {
                             if (selected) {
-                                values.color = '#e03131'; // 진한 빨간색
-                                values.strokeWidth = 2;   // 글씨에 흰색 외곽선을 줘서 더 잘보이게
+                                values.color = '#e03131'; 
+                                values.strokeWidth = 2;   
                                 values.strokeColor = '#ffffff';
                             }
                         },
                         node: function(values, id, selected, hovering) {
                             if (selected) {
-                                values.borderColor = '#e03131'; // 클릭 시 원 테두리도 빨간색으로
+                                values.borderColor = '#e03131'; 
                             }
                         }
                     }
@@ -308,10 +316,10 @@
                     width: 1.5, 
                     smooth: { type: 'continuous' }, 
                     hoverWidth: 2, 
-                    selectionWidth: 4, // 💡 기존 3에서 4로 두께 증가 (선택 시 더 두껍게)
+                    selectionWidth: 4, 
                     color: {
-                        color: '#ced4da', // 평상시 연한 회색 선
-                        highlight: '#e03131' // 💡 클릭 시 빨간색 굵은 선으로 변경!
+                        color: '#ced4da', 
+                        highlight: '#e03131' 
                     }
                 },
                 physics: {
@@ -326,14 +334,17 @@
 
             network = new vis.Network(container, data, options);
 
+            // 💡 캔버스가 그려질 때 개입하여 텍스트를 그리는 핵심 이벤트
             network.on("afterDrawing", function (ctx) {
                 const positions = network.getPositions();
+                const selectedNodes = network.getSelectedNodes(); // 현재 클릭(선택)된 노드 가져오기
                 
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.font = 'bold 12px Pretendard, "Malgun Gothic", sans-serif';
 
                 nodesData.forEach(node => {
+                    // 1. 프로그램 노드의 중앙에 건수와 참여 인원 그리기 (기존 기능)
                     if (node.group === 'Program' && !node.hidden) {
                         const pos = positions[node.id];
                         if (pos) {
@@ -343,6 +354,46 @@
                         }
                     }
                 });
+
+                // 2. 💡 운영부서 노드가 클릭되었을 때 옆에 요약 정보 띄우기 (새로운 기능)
+                if (selectedNodes.length === 1) {
+                    const selectedNodeId = selectedNodes[0];
+                    const selectedNode = nodesData.find(n => n.id === selectedNodeId);
+                    
+                    if (selectedNode && selectedNode.group === 'Department') {
+                        const pos = positions[selectedNodeId];
+                        if (pos) {
+                            // 필터링되어 화면에 보이는 프로그램만 통계에 반영
+                            const connectedEdges = edgesData.filter(e => e.from === selectedNodeId);
+                            const connectedProgIds = connectedEdges.map(e => e.to);
+                            const connectedProgs = nodesData.filter(n => connectedProgIds.includes(n.id) && !n.hidden);
+                            
+                            const totalProgs = connectedProgs.length;
+                            const totalParticipants = connectedProgs.reduce((sum, p) => sum + p.value, 0);
+                            
+                            const text = `📌 총 ${totalProgs}건 / ${totalParticipants}명`;
+                            
+                            // 노드 라벨 텍스트 크기를 미리 계산하여, 그보다 살짝 오른쪽에 배치
+                            ctx.font = '18px Pretendard, "Malgun Gothic", sans-serif'; 
+                            const labelWidth = ctx.measureText(selectedNode.label).width;
+                            const offsetX = pos.x + (labelWidth / 2) + 35; // 박스 우측으로 일정 간격 띄움
+                            
+                            // 다시 요약 정보용 폰트 설정
+                            ctx.font = 'bold 15px Pretendard, "Malgun Gothic", sans-serif';
+                            ctx.textAlign = 'left';
+                            ctx.textBaseline = 'middle';
+                            
+                            // 글자가 복잡한 선이나 점과 겹쳐도 잘 보이도록 하얀색 테두리(stroke) 추가
+                            ctx.lineWidth = 4;
+                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                            ctx.strokeText(text, offsetX, pos.y);
+                            
+                            // 빨간색 텍스트 채우기
+                            ctx.fillStyle = '#e03131'; 
+                            ctx.fillText(text, offsetX, pos.y);
+                        }
+                    }
+                }
             });
 
             bindNetworkEvents(); 
